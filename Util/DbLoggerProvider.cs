@@ -14,28 +14,17 @@ namespace SendBlazorLoggerToDataBase.Util
         private readonly BlockingCollection<DBLog> _messageQueue = new(new ConcurrentQueue<DBLog>());
 
         private readonly Task _outputTask;
-        //private readonly IServiceProvider _serviceProvider;
         private readonly ApplicationDbContext _dbContext;
         private bool _isDisposed;
 
-        //public DBLoggerProvider(
-
-        //    IServiceProvider serviceProvider)
-        //{
-        //    _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        //    _outputTask = Task.Run(ProcessLogQueue);
-        //}
-        public DbLoggerProvider(
-
-           ApplicationDbContext dbContext)
+        public DbLoggerProvider(ApplicationDbContext dbContext)
         {
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
             _outputTask = Task.Run(ProcessLogQueue);
         }
-
         public ILogger CreateLogger(string categoryName)
         {
-            return new DBLogger(this,_dbContext);
+            return new DBLogger(this,categoryName);
         }
         private async Task ProcessLogQueue()
         {
@@ -59,7 +48,6 @@ namespace SendBlazorLoggerToDataBase.Util
                 await Task.Delay(_interval, _cancellationTokenSource.Token);
             }
         }
-
         internal void AddLogItem(DBLog appLogItem)
         {
             if (!_messageQueue.IsAddingCompleted)
@@ -67,7 +55,6 @@ namespace SendBlazorLoggerToDataBase.Util
                 _messageQueue.Add(appLogItem, _cancellationTokenSource.Token);
             }
         }
-
         private async Task SaveLogItemsAsync(IList<DBLog> items, CancellationToken cancellationToken)
         {
             try
@@ -79,16 +66,6 @@ namespace SendBlazorLoggerToDataBase.Util
 
                 // We need a separate context for the logger to call its SaveChanges several times,
                 // without using the current request's context and changing its internal state.
-                //await _serviceProvider.RunScopedServiceAsync<IUnitOfWork>(async context =>
-                //{
-                //    foreach (var item in items)
-                //    {
-                //        var addedEntry = context.Set<DBLog>().Add(item.ExceptionMessage);
-                //        addedEntry.SetAddedShadowProperties(item.StackTrace);
-                //    }
-
-                //    await context.SaveChangesAsync(cancellationToken);
-                //});
                 foreach (var item in items)
                 {
                     var addedEntry = _dbContext.DbLogs.Add(item);
@@ -136,6 +113,7 @@ namespace SendBlazorLoggerToDataBase.Util
                         Stop();
                         _messageQueue.Dispose();
                         _cancellationTokenSource.Dispose();
+                        _dbContext.Dispose();
                     }
                 }
                 finally

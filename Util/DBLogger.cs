@@ -7,16 +7,16 @@ namespace SendBlazorLoggerToDataBase.Util
     public class DBLogger:ILogger
     {
         private readonly LogLevel _minLevel;
-        private readonly ApplicationDbContext _dbContext;
         private readonly DbLoggerProvider _loggerProvider;
+        private readonly string _categoryName;
 
         public DBLogger(
             DbLoggerProvider loggerProvider,
-            ApplicationDbContext dbContext
+            string categoryName
         )
         {
-            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
             _loggerProvider= loggerProvider ?? throw new ArgumentNullException(nameof(loggerProvider));
+            _categoryName= categoryName;
         }
 
         public IDisposable BeginScope<TState>(TState state)
@@ -62,9 +62,8 @@ namespace SendBlazorLoggerToDataBase.Util
             {
                 EventName = eventId.Name,
                 LogLevel = logLevel.ToString(),
-                Message = message,
-                StackTrace=exception?.StackTrace,
-                
+                Message = $"{_categoryName}{Environment.NewLine}{message}",
+                StackTrace=exception?.StackTrace
             };
             _loggerProvider.AddLogItem(dblLogItem);
         }
