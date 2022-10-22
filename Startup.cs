@@ -46,8 +46,8 @@ namespace SendBlazorLoggerToDataBase
 
             #region CustomLogProvider
             var serviceProvider = app.ApplicationServices.CreateScope().ServiceProvider;
-            var appDbContext = serviceProvider.GetRequiredService<ApplicationDbContext>();
-            loggerFactory.AddProvider(new DbLoggerProvider(appDbContext));
+            //var appDbContext = serviceProvider.GetRequiredService<ApplicationDbContext>();
+            loggerFactory.AddProvider(new DbLoggerProvider(serviceProvider));
             #endregion
 
             app.UseStaticFiles();

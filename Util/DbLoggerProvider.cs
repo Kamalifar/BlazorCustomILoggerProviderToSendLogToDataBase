@@ -5,7 +5,7 @@ using SendBlazorLoggerToDataBase.Entities;
 
 namespace SendBlazorLoggerToDataBase.Util
 {
-    public class DbLoggerProvider:ILoggerProvider
+    public class DbLoggerProvider : ILoggerProvider
     {
         private readonly CancellationTokenSource _cancellationTokenSource = new();
         private readonly IList<DBLog> _currentBatch = new List<DBLog>();
@@ -14,17 +14,17 @@ namespace SendBlazorLoggerToDataBase.Util
         private readonly BlockingCollection<DBLog> _messageQueue = new(new ConcurrentQueue<DBLog>());
 
         private readonly Task _outputTask;
-        private readonly ApplicationDbContext _dbContext;
+        private readonly IServiceProvider _serviceProvider;
         private bool _isDisposed;
 
-        public DbLoggerProvider(ApplicationDbContext dbContext)
+        public DbLoggerProvider(IServiceProvider serviceProvider)
         {
-            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             _outputTask = Task.Run(ProcessLogQueue);
         }
         public ILogger CreateLogger(string categoryName)
         {
-            return new DBLogger(this,categoryName);
+            return new DBLogger(this, categoryName);
         }
         private async Task ProcessLogQueue()
         {
@@ -66,12 +66,21 @@ namespace SendBlazorLoggerToDataBase.Util
 
                 // We need a separate context for the logger to call its SaveChanges several times,
                 // without using the current request's context and changing its internal state.
-                foreach (var item in items)
+                var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
+                using (var scope = scopeFactory.CreateScope())
                 {
-                    var addedEntry = _dbContext.DbLogs.Add(item);
-                }
+                    var scopedProvider = scope.ServiceProvider;
+                    using (var newDbContext = scopedProvider.GetRequiredService<ApplicationDbContext>())
+                    {
+                        foreach (var item in items)
+                        {
+                            var addedEntry = newDbContext.DbLogs.Add(item);
+                        }
 
-                await _dbContext.SaveChangesAsync(cancellationToken);
+                        await newDbContext.SaveChangesAsync(cancellationToken);
+                        // ...
+                    }
+                }
 
             }
             catch
@@ -113,7 +122,6 @@ namespace SendBlazorLoggerToDataBase.Util
                         Stop();
                         _messageQueue.Dispose();
                         _cancellationTokenSource.Dispose();
-                        _dbContext.Dispose();
                     }
                 }
                 finally
